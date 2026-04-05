@@ -535,12 +535,13 @@ function updateSheetStatus() {
 }
 
 async function postToSheet(data) {
-  const response = await fetch(sheetUrl, {
+  await fetch(sheetUrl, {
     method: 'POST',
+    mode: 'no-cors',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(data)
   });
-  return response.json();
+  return {ok: true};
 }
 
 async function testConnection() {
