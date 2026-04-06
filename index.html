@@ -160,11 +160,11 @@ input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1) brigh
         <div class="card-label">Trip info</div>
         <div class="field">
           <label>Date</label>
-          <input type="date" id="inp-date">
+          <input type="date" id="inp-date" oninput="saveDraft()">
         </div>
         <div class="field">
           <label>Trip type</label>
-          <select id="inp-type">
+          <select id="inp-type" onchange="saveDraft()">
             <option>Restaurant visit</option>
             <option>Area meeting</option>
             <option>Training</option>
@@ -175,36 +175,41 @@ input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1) brigh
         </div>
         <div class="field">
           <label>Purpose / restaurant #s</label>
-          <textarea id="inp-purpose" placeholder="e.g. Visits – #1234, #5678, #9101"></textarea>
+          <textarea id="inp-purpose" placeholder="e.g. Visits – #1234, #5678, #9101" oninput="saveDraft()"></textarea>
         </div>
         <div class="row-2">
           <div class="field">
             <label>From</label>
-            <input type="text" id="inp-from" placeholder="City or location">
+            <input type="text" id="inp-from" placeholder="City or location" oninput="saveDraft()">
           </div>
           <div class="field">
             <label>To</label>
-            <input type="text" id="inp-to" placeholder="City or location">
+            <input type="text" id="inp-to" placeholder="City or location" oninput="saveDraft()">
           </div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-label">Odometer</div>
+        <div id="trip-start-banner" style="display:none;background:rgba(200,240,100,0.12);border:1px solid rgba(200,240,100,0.4);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--accent);font-family:var(--mono)">
+          <div style="font-size:11px;opacity:.7;margin-bottom:2px">TRIP STARTED</div>
+          <div id="trip-start-display"></div>
+        </div>
         <div class="odo-row">
           <div class="field" style="margin:0">
             <label>Start</label>
-            <input type="number" id="inp-start" placeholder="e.g. 10250" oninput="calcMiles()" inputmode="numeric">
+            <input type="number" id="inp-start" placeholder="e.g. 10250" oninput="calcMiles();saveDraft()" inputmode="numeric">
           </div>
           <div class="field" style="margin:0">
             <label>End</label>
-            <input type="number" id="inp-end" placeholder="e.g. 10487" oninput="calcMiles()" inputmode="numeric">
+            <input type="number" id="inp-end" placeholder="e.g. 10487" oninput="calcMiles();saveDraft()" inputmode="numeric">
           </div>
         </div>
         <div class="odo-result" style="margin-bottom:14px">
           <div class="odo-num" id="calc-miles">—</div>
           <div class="odo-lbl">miles this trip</div>
         </div>
+        <button class="btn btn-secondary" onclick="startTrip()" id="start-trip-btn" style="margin-bottom:10px">Record Starting Odometer</button>
       </div>
 
       <button class="btn btn-primary" onclick="addTrip()">Save Trip</button>
@@ -347,6 +352,8 @@ function init() {
   document.getElementById('filter-month').addEventListener('change', renderHistory);
   document.getElementById('sum-month').addEventListener('change', renderSummary);
   updateStreak();
+  loadDraft();
+  showTripStartBanner();
   renderHistory();
   renderSummary();
   updateSheetStatus();
@@ -418,6 +425,58 @@ async function addTrip() {
   }
 }
 
+function startTrip() {
+  const start = document.getElementById('inp-start').value;
+  if (!start) {
+    showAlert('log-alert', 'Enter your starting odometer first.', 'warn'); return;
+  }
+  localStorage.setItem('wendys_trip_start', JSON.stringify({ odo: start, time: new Date().toISOString() }));
+  showTripStartBanner();
+  showAlert('log-alert', `Starting odometer ${parseFloat(start).toLocaleString()} recorded. Drive safely.`, 'ok');
+}
+
+function showTripStartBanner() {
+  const stored = localStorage.getItem('wendys_trip_start');
+  if (!stored) return;
+  const { odo, time } = JSON.parse(stored);
+  const banner = document.getElementById('trip-start-banner');
+  const display = document.getElementById('trip-start-display');
+  const t = new Date(time);
+  const timeStr = t.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  display.textContent = `${parseFloat(odo).toLocaleString()} mi · recorded at ${timeStr}`;
+  banner.style.display = 'block';
+  document.getElementById('inp-start').value = odo;
+  calcMiles();
+}
+
+function saveDraft() {
+  const draft = {
+    date: document.getElementById('inp-date').value,
+    type: document.getElementById('inp-type').value,
+    purpose: document.getElementById('inp-purpose').value,
+    from: document.getElementById('inp-from').value,
+    to: document.getElementById('inp-to').value,
+    start: document.getElementById('inp-start').value,
+    end: document.getElementById('inp-end').value,
+  };
+  localStorage.setItem('wendys_draft', JSON.stringify(draft));
+}
+
+function loadDraft() {
+  const raw = localStorage.getItem('wendys_draft');
+  if (!raw) return;
+  const d = JSON.parse(raw);
+  if (d.date) document.getElementById('inp-date').value = d.date;
+  if (d.type) document.getElementById('inp-type').value = d.type;
+  if (d.purpose) document.getElementById('inp-purpose').value = d.purpose;
+  if (d.from) document.getElementById('inp-from').value = d.from;
+  if (d.to) document.getElementById('inp-to').value = d.to;
+  if (d.start) document.getElementById('inp-start').value = d.start;
+  if (d.end) document.getElementById('inp-end').value = d.end;
+  calcMiles();
+}
+
+
 function clearForm() {
   document.getElementById('inp-date').value = today();
   document.getElementById('inp-purpose').value = '';
@@ -426,6 +485,9 @@ function clearForm() {
   document.getElementById('inp-start').value = '';
   document.getElementById('inp-end').value = '';
   document.getElementById('calc-miles').textContent = '—';
+  document.getElementById('trip-start-banner').style.display = 'none';
+  localStorage.removeItem('wendys_draft');
+  localStorage.removeItem('wendys_trip_start');
 }
 
 function deleteTrip(id) {
